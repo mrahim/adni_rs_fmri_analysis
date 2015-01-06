@@ -1,29 +1,24 @@
 """
     CanICA on ADNI rs-fmri
 """
-import os, glob
+import os
 import numpy as np
-import pandas as pd
 from nilearn.plotting import plot_img
 from nilearn.decomposition.canica import CanICA
 from nilearn.input_data import MultiNiftiMasker
 import nibabel as nib
 import matplotlib.pyplot as plt
 from nilearn.plotting import plot_stat_map
+from fetch_data import datasets
 
-BASE_DIR = '/disk4t/mehdi/data/ADNI_baseline_rs_fmri_mri/preprocess_output'
 CACHE_DIR = '/disk4t/mehdi/data/tmp'
 
-subject_paths = sorted(glob.glob(os.path.join(BASE_DIR, 's[0-9]*')))
-excluded_subjects = np.loadtxt(os.path.join(BASE_DIR,
-                                            'excluded_subjects.txt'), dtype=str)
 
-data = pd.read_csv(os.path.join(BASE_DIR, 'description_file.csv'))
-func_files = []
-for f in subject_paths:
-    _, subject_id = os.path.split(f)
-    if not subject_id in excluded_subjects:
-        func_files.append(glob.glob(os.path.join(f, 'func', 'wr*.nii'))[0])
+dataset = datasets.fetch_adni_rs_fmri()
+func_files = dataset['func']
+dx_group = dataset['dx_group']
+
+
 n_sample = 140
 idx = np.random.randint(len(func_files), size=n_sample)
 func_files_sample = np.array(func_files)[idx]
@@ -47,7 +42,8 @@ canica.fit(func_files_sample)
 components_img = canica.masker_.inverse_transform(canica.components_)
 # components_img is a Nifti Image object, and can be saved to a file with
 # the following line:
-components_img.to_filename('/disk4t/mehdi/data/tmp/canica_resting_state_140.nii.gz')
+components_img.to_filename(os.path.join(CACHE_DIR,
+                                        'canica_resting_state_140.nii.gz'))
 
 ### Visualize the results #####################################################
 # Show some interesting components
