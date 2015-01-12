@@ -5,19 +5,40 @@
         - Normalization MNI
         - Smoothing
 """
-import os
+import os, glob
+import nibabel as nib
 from pypreprocess.nipype_preproc_spm_utils import do_subjects_preproc
 
 
 BASE_DIR = '/disk4t/mehdi/data/ADNI_baseline_rs_fmri_mri'
 
-jobfile = 'rs_fmri_adni_preproc.ini'
-dataset_dir = BASE_DIR
+###
+def delete_scans_fmri(niimg):
+    """ Load a 4D nii image and delete 3 first scans
+    """
+    img = nib.load(niimg)
+    img = nib.Nifti1Image(img.get_data()[...,3:], img.get_affine())
+    head, tail = os.path.split(niimg)
+    img.to_filename(os.path.join(head, 'z' + tail))
 
+###
+def delete_scans_adni():
+    """ Process adni rs fmri folder
+    """
+    fmri_paths = sorted(glob.glob(os.path.join(BASE_DIR, 's*')))
+    for fmri_path in fmri_paths:
+        print os.path.split(fmri_path)[1]
+        fmri_file = glob.glob(os.path.join(fmri_path, 'func', '*.nii'))
+        if len(fmri_file) > 0:
+            delete_scans_fmri(fmri_file[0])
+
+###
+
+jobfile = 'preprocess_rs_fmri_adni_config.ini'
+dataset_dir = BASE_DIR
 
 # sourcing FSL
 os.system('source /etc/fsl/4.1/fsl.sh')
-
 
 # preprocess the data
 results = do_subjects_preproc(jobfile, dataset_dir=BASE_DIR)
