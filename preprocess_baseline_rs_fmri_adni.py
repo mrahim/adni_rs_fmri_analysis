@@ -28,11 +28,27 @@ def delete_scans_adni():
     fmri_paths = sorted(glob.glob(os.path.join(BASE_DIR, 's*')))
     for fmri_path in fmri_paths:
         print os.path.split(fmri_path)[1]
-        fmri_file = glob.glob(os.path.join(fmri_path, 'func', '*.nii'))
+        fmri_file = glob.glob(os.path.join(fmri_path, 'func', 'A*.nii'))
         if len(fmri_file) > 0:
             delete_scans_fmri(fmri_file[0])
 
 ###
+def clean_dirs_adni():
+    """ Remove all processed data
+    """
+    fmri_paths = sorted(glob.glob(os.path.join(BASE_DIR, 's*')))
+    for fmri_path in fmri_paths:
+        fmri_file = glob.glob(os.path.join(fmri_path, 'func', 'z*.nii'))
+        for f in fmri_file:
+            os.remove(f)
+            print f, 'removed'
+        
+
+# Delete first 3 scans
+"""
+clean_dirs_adni()
+delete_scans_adni()
+"""
 
 jobfile = 'preprocess_rs_fmri_adni_config.ini'
 dataset_dir = BASE_DIR
