@@ -9,6 +9,8 @@ import numpy as np
 from fetch_data import fetch_adni_rs_fmri
 from nilearn.datasets import fetch_msdl_atlas
 from nilearn.input_data import NiftiMapsMasker
+from sklearn.preprocessing import StandardScaler
+from sklearn.grid_search import GridSearchCV
 import matplotlib.pyplot as plt
 
 
@@ -67,7 +69,8 @@ from sklearn.svm import SVC
 from sklearn.cross_validation import StratifiedShuffleSplit
     
 corr_mat = np.array(corr_mat)
-corr_feat = np.array(corr_feat)
+#corr_feat = StandardScaler().fit_transform(np.array(corr_feat))
+corr_feat  = np.array(corr_feat)
 
 nb_iter = 100
 pg_counter = 0
@@ -84,10 +87,12 @@ for gr in groups:
     x = np.concatenate((g1_feat, g2_feat), axis=0)
     y = np.ones(len(x))
     y[len(x) - len(g2_feat):] = 0
-    
-    estim = SVC(kernel='linear')
-    sss = StratifiedShuffleSplit(y, n_iter=nb_iter, test_size=0.2)
-    # 1000 runs with randoms 80% / 20% : StratifiedShuffleSplit
+    svr = SVC(kernel='linear')
+    param_grid = {'C': np.logspace(-3,3,7), 'kernel': ['linear']}
+    estim = GridSearchCV(cv=None, estimator=svr,
+                         param_grid=param_grid, n_jobs=1)
+    sss = StratifiedShuffleSplit(y, n_iter=nb_iter, test_size=0.1)
+    # 100 runs with randoms 90% / 10% : StratifiedShuffleSplit
     counter = 0
     for train, test in sss:
         Xtrain, Xtest = x[train], x[test]
