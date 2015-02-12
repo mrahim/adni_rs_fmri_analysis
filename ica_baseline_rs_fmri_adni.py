@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 from nilearn.plotting import plot_stat_map
 from fetch_data import datasets
 
-CACHE_DIR = '/disk4t/mehdi/data/tmp'
+CACHE_DIR = '/home/mr234268/data'
 
 
 dataset = datasets.fetch_adni_rs_fmri()
