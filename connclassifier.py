@@ -57,10 +57,11 @@ def compute_connectivity_subjects(func_list, atlas, mask, conn, n_jobs):
 ###############################################################################
 dataset = fetch_adni_rs_fmri()
 mask = fetch_adni_masks()['mask_petmr']
+atlas_name = 'msdl'
 atlas = fetch_msdl_atlas()['maps']
 conn_name= 'lw'
 conn = compute_connectivity_subjects(list(dataset.func), atlas, mask,
-                                     conn=fc, n_jobs=20)
+                                     conn=conn_name, n_jobs=-1)
 
 ###############################################################################
 # Classification
@@ -85,8 +86,9 @@ y = np.asarray([1] * len(idx[groups[0]]) + [0] * len(idx[groups[1]]))
 classifier = LogisticRegression(penalty='l1', random_state=42)
 sss = StratifiedShuffleSplit(y, n_iter=100, test_size=.25, random_state=42)
 
-p = Parallel(n_jobs=20, verbose=5)(delayed(train_and_test)(classifier, X, y,
+p = Parallel(n_jobs=-1, verbose=5)(delayed(train_and_test)(classifier, X, y,
              train, test) for train, test in sss)
 
-output_file = os.path.join(CACHE_DIR, 'lw')
+output_file = os.path.join(CACHE_DIR, '_'.join([groups[0], groups[1],
+                                                atlas_name, conn_name]))
 np.savez_compressed(data=p)
