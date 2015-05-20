@@ -5,12 +5,13 @@ Created on Tue May 19 15:48:41 2015
 @author: mehdi.rahim@cea.fr
 """
 
-import os, sys, glob
+import os, sys
 import numpy as np
 from fetch_data import fetch_adni_masks, fetch_adni_rs_fmri, \
-                       set_cache_base_dir, set_group_indices
+                       set_cache_base_dir, set_group_indices, \
+                       fetch_adni_baseline_rs_fmri
 from nilearn.input_data import NiftiMapsMasker
-from nilearn.datasets import fetch_msdl_atlas, fetch_smith_2009
+from nilearn.datasets import fetch_msdl_atlas
 from sklearn.covariance import GraphLassoCV, LedoitWolf, OAS, \
                                ShrunkCovariance
 from sklearn.linear_model import LogisticRegression, RidgeClassifierCV
@@ -34,9 +35,11 @@ def fetch_atlas(atlas_name):
     if atlas_name == 'msdl':
         atlas = fetch_msdl_atlas()['maps']
     elif atlas_name == 'harvard_oxford':
-        atlas = os.path.join(CACHE_DIR, 'atlas', 'HarvardOxford-cortl-prob-2mm.nii.gz')
+        atlas = os.path.join(CACHE_DIR, 'atlas',
+                             'HarvardOxford-cortl-prob-2mm.nii.gz')
     elif atlas_name == 'juelich':
-        atlas = os.path.join(CACHE_DIR, 'atlas', 'Juelich-prob-2mm.nii.gz')
+        atlas = os.path.join(CACHE_DIR, 'atlas',
+                             'Juelich-prob-2mm.nii.gz')
     elif atlas_name == 'mayo':
         atlas = os.path.join(CACHE_DIR, 'atlas', 'atlas_68_rois.nii.gz')
     return atlas
@@ -51,7 +54,7 @@ def compute_connectivity_subject(conn, func, masker):
     ts = masker.fit_transform(func)
     
     if conn == 'gl':
-        fc = GraphLassoCV()
+        fc = GraphLassoCV(max_iter=1000)
     elif conn == 'lw':
         fc = LedoitWolf()
     elif conn == 'oas':
@@ -72,9 +75,9 @@ def compute_connectivity_subjects(func_list, atlas, mask, conn, n_jobs=-1):
                              resampling_target='data',
                              memory=CACHE_DIR, memory_level=2)
 
-    p = Parallel(n_jobs=n_jobs, verbose=5)(delayed(compute_connectivity_subject)\
-                                            (conn, func, masker)\
-                                            for func in func_list)
+    p = Parallel(n_jobs=n_jobs, verbose=5)(delayed(
+                 compute_connectivity_subject)(conn, func, masker)\
+                 for func in func_list)
     return np.asarray(p)
 
 
@@ -86,7 +89,6 @@ def train_and_test(classifier, X, y, train, test):
     """
     classifier.fit(X[train, :], y[train])
     score = classifier.score(X[test, :], y[test])
-    print score
     B = Bunch(score=score, coef=classifier.coef_)
     return B
 
@@ -94,7 +96,8 @@ def classify_connectivity(X, y, classifier_name, n_jobs=-1):
     """ Returns 100 shuffle split scores
     """
     if classifier_name == 'logreg_l1':
-        classifier = LogisticRegression(penalty='l1', dual=False, random_state=42)
+        classifier = LogisticRegression(penalty='l1', dual=False,
+                                        random_state=42)
     elif classifier_name == 'logreg_l2':
         classifier = LogisticRegression(penalty='l2', random_state=42)
     elif classifier_name == 'ridge':
@@ -104,15 +107,15 @@ def classify_connectivity(X, y, classifier_name, n_jobs=-1):
     elif classifier_name == 'svc_l1':
         classifier = LinearSVC(penalty='l1', dual=False, random_state=42)
 
-    p = Parallel(n_jobs=n_jobs, verbose=5)(delayed(train_and_test)(classifier, X, y,
-                 train, test) for train, test in sss)
+    p = Parallel(n_jobs=n_jobs, verbose=5)(delayed(train_and_test)(
+                 classifier, X, y, train, test) for train, test in sss)
     return p    
 
 
 ###############################################################################
 # Main loop
 ###############################################################################
-dataset = fetch_adni_rs_fmri()
+dataset = fetch_adni_baseline_rs_fmri()
 mask = fetch_adni_masks()['mask_petmr']
 
 atlas_names = ['mayo', 'harvard_oxford', 'juelich', 'msdl']
@@ -130,10 +133,13 @@ for atlas_name in atlas_names:
         for groups in all_groups:
             groups_idx = np.hstack((idx[groups[0]], idx[groups[1]]))
             X = conn[groups_idx, 0, :]
-            y = np.asarray([1] * len(idx[groups[0]]) + [0] * len(idx[groups[1]]))
-            sss = StratifiedShuffleSplit(y, n_iter=100, test_size=.25, random_state=42)
+            y = np.asarray([1] * len(idx[groups[0]]) +
+                           [0] * len(idx[groups[1]]))
+            sss = StratifiedShuffleSplit(y, n_iter=100,
+                                         test_size=.25, random_state=42)
         
-            classifier_names = ['ridge', 'svc_l1', 'svc_l2', 'logreg_l1', 'logreg_l2']
+            classifier_names = ['ridge', 'svc_l1', 'svc_l2',
+                                'logreg_l1', 'logreg_l2']
     
             for classifier_name in classifier_names:
                 print atlas_name, conn_name, groups, classifier_name    
