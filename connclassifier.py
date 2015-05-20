@@ -5,21 +5,46 @@ Created on Tue May 19 15:48:41 2015
 @author: mehdi.rahim@cea.fr
 """
 
-import os, glob
+import os, sys, glob
 import numpy as np
 from fetch_data import fetch_adni_masks, fetch_adni_rs_fmri, \
                        set_cache_base_dir, set_group_indices
 from nilearn.input_data import NiftiMapsMasker
-from nilearn.datasets import fetch_msdl_atlas
+from nilearn.datasets import fetch_msdl_atlas, fetch_smith_2009
 from sklearn.covariance import GraphLassoCV, LedoitWolf, OAS, \
                                ShrunkCovariance
-from sklearn.linear_model import LogisticRegression
+from sklearn.linear_model import LogisticRegression, RidgeClassifierCV
+from sklearn.svm import LinearSVC
 from sklearn.datasets.base import Bunch
 from sklearn.cross_validation import StratifiedShuffleSplit
 
 from joblib import Parallel, delayed
 CACHE_DIR = set_cache_base_dir()
 
+sys.stdout = os.fdopen(sys.stdout.fileno(), 'w', 0)
+sys.stderr = os.fdopen(sys.stderr.fileno(), 'w', 0)
+
+###############################################################################
+# Atlas
+###############################################################################
+
+def fetch_atlas(atlas_name):
+    """Retruns selected atlas path
+    """
+    if atlas_name == 'msdl':
+        atlas = fetch_msdl_atlas()['maps']
+    elif atlas_name == 'harvard_oxford':
+        atlas = os.path.join(CACHE_DIR, 'atlas', 'HarvardOxford-cortl-prob-2mm.nii.gz')
+    elif atlas_name == 'juelich':
+        atlas = os.path.join(CACHE_DIR, 'atlas', 'Juelich-prob-2mm.nii.gz')
+    elif atlas_name == 'mayo':
+        atlas = os.path.join(CACHE_DIR, 'atlas', 'atlas_68_rois.nii.gz')
+    return atlas
+
+
+###############################################################################
+# Connectivity
+###############################################################################
 def compute_connectivity_subject(conn, func, masker):
     """ Returns connectivity of one fMRI for a given atlas
     """
@@ -38,7 +63,7 @@ def compute_connectivity_subject(conn, func, masker):
     ind = np.tril_indices(ts.shape[1], k=-1)
     return fc.covariance_[ind], fc.precision_[ind]
 
-def compute_connectivity_subjects(func_list, atlas, mask, conn, n_jobs):
+def compute_connectivity_subjects(func_list, atlas, mask, conn, n_jobs=-1):
     """ Returns connectivities for all subjects
     tril matrix n_subjects * n_rois_tril
     """
@@ -52,16 +77,6 @@ def compute_connectivity_subjects(func_list, atlas, mask, conn, n_jobs):
                                             for func in func_list)
     return np.asarray(p)
 
-###############################################################################
-# Connectivity
-###############################################################################
-dataset = fetch_adni_rs_fmri()
-mask = fetch_adni_masks()['mask_petmr']
-atlas_name = 'msdl'
-atlas = fetch_msdl_atlas()['maps']
-conn_name= 'lw'
-conn = compute_connectivity_subjects(list(dataset.func), atlas, mask,
-                                     conn=conn_name, n_jobs=-1)
 
 ###############################################################################
 # Classification
@@ -69,26 +84,66 @@ conn = compute_connectivity_subjects(list(dataset.func), atlas, mask,
 def train_and_test(classifier, X, y, train, test):
     """ Returns accuracy and coeffs for a train and test
     """
-    classifier.fit(X[train], y[train])
-    score = classifier.score(X[test], y[test])
+    classifier.fit(X[train, :], y[train])
+    score = classifier.score(X[test, :], y[test])
+    print score
     B = Bunch(score=score, coef=classifier.coef_)
     return B
 
+def classify_connectivity(X, y, classifier_name, n_jobs=-1):
+    """ Returns 100 shuffle split scores
+    """
+    if classifier_name == 'logreg_l1':
+        classifier = LogisticRegression(penalty='l1', dual=False, random_state=42)
+    elif classifier_name == 'logreg_l2':
+        classifier = LogisticRegression(penalty='l2', random_state=42)
+    elif classifier_name == 'ridge':
+        classifier = RidgeClassifierCV(alphas=np.logspace(-3, 3, 7))
+    elif classifier_name == 'svc_l2':
+        classifier = LinearSVC(penalty='l2', random_state=42)
+    elif classifier_name == 'svc_l1':
+        classifier = LinearSVC(penalty='l1', dual=False, random_state=42)
 
-idx = set_group_indices(dataset.dx_group)
-idx['MCI'] = np.hstack((idx['EMCI'], idx['LMCI']))
+    p = Parallel(n_jobs=n_jobs, verbose=5)(delayed(train_and_test)(classifier, X, y,
+                 train, test) for train, test in sss)
+    return p    
 
-groups = ['AD', 'MCI']
-groups_idx = np.hstack((idx[groups[0]], idx[groups[1]]))
-X = conn[groups_idx, :]
-y = np.asarray([1] * len(idx[groups[0]]) + [0] * len(idx[groups[1]]))
 
-classifier = LogisticRegression(penalty='l1', random_state=42)
-sss = StratifiedShuffleSplit(y, n_iter=100, test_size=.25, random_state=42)
+###############################################################################
+# Main loop
+###############################################################################
+dataset = fetch_adni_rs_fmri()
+mask = fetch_adni_masks()['mask_petmr']
 
-p = Parallel(n_jobs=-1, verbose=5)(delayed(train_and_test)(classifier, X, y,
-             train, test) for train, test in sss)
+atlas_names = ['mayo', 'harvard_oxford', 'juelich', 'msdl']
 
-output_file = os.path.join(CACHE_DIR, '_'.join([groups[0], groups[1],
-                                                atlas_name, conn_name]))
-np.savez_compressed(data=p)
+for atlas_name in atlas_names:
+    atlas = fetch_atlas(atlas_name)
+    conn_names = ['gl', 'lw', 'oas', 'scov']
+    for conn_name in conn_names:
+        conn = compute_connectivity_subjects(list(dataset.func), atlas, mask,
+                                             conn=conn_name, n_jobs=-1)
+        idx = set_group_indices(dataset.dx_group)
+        idx['MCI'] = np.hstack((idx['EMCI'], idx['LMCI']))
+        all_groups = [['AD', 'MCI'], ['AD', 'Normal'], ['MCI', 'Normal']]
+    
+        for groups in all_groups:
+            groups_idx = np.hstack((idx[groups[0]], idx[groups[1]]))
+            X = conn[groups_idx, 0, :]
+            y = np.asarray([1] * len(idx[groups[0]]) + [0] * len(idx[groups[1]]))
+            sss = StratifiedShuffleSplit(y, n_iter=100, test_size=.25, random_state=42)
+        
+            classifier_names = ['ridge', 'svc_l1', 'svc_l2', 'logreg_l1', 'logreg_l2']
+    
+            for classifier_name in classifier_names:
+                print atlas_name, conn_name, groups, classifier_name    
+                p = classify_connectivity(X, y, classifier_name)
+                output_folder = os.path.join(CACHE_DIR,
+                                             '_'.join(['conn', atlas_name]))
+                if not os.path.isdir(output_folder):
+                    os.mkdir(output_folder)
+                output_file = os.path.join(output_folder,
+                                           '_'.join([groups[0], groups[1],
+                                                     atlas_name, conn_name,
+                                                     classifier_name]))
+                np.savez_compressed(output_file, data=p)
