@@ -7,10 +7,11 @@ Created on Tue May 19 15:48:41 2015
 
 import os, sys
 import numpy as np
+import nibabel as nib
 from fetch_data import fetch_adni_masks, fetch_adni_rs_fmri, \
                        set_cache_base_dir, set_group_indices, \
                        fetch_adni_baseline_rs_fmri
-from nilearn.input_data import NiftiMapsMasker
+from nilearn.input_data import NiftiMapsMasker, NiftiLabelsMasker
 from nilearn.datasets import fetch_msdl_atlas
 from sklearn.covariance import GraphLassoCV, LedoitWolf, OAS, \
                                ShrunkCovariance
@@ -35,11 +36,16 @@ def fetch_atlas(atlas_name):
     if atlas_name == 'msdl':
         atlas = fetch_msdl_atlas()['maps']
     elif atlas_name == 'harvard_oxford':
+#        atlas = os.path.join(CACHE_DIR, 'atlas',
+#                             'HarvardOxford-cortl-prob-2mm.nii.gz')
         atlas = os.path.join(CACHE_DIR, 'atlas',
-                             'HarvardOxford-cortl-prob-2mm.nii.gz')
+                             'HarvardOxford-cortl-maxprob-thr0-2mm.nii.gz')
     elif atlas_name == 'juelich':
+#        atlas = os.path.join(CACHE_DIR, 'atlas',
+#                             'Juelich-prob-2mm.nii.gz')
         atlas = os.path.join(CACHE_DIR, 'atlas',
-                             'Juelich-prob-2mm.nii.gz')
+                             'Juelich-maxprob-thr0-2mm.nii.gz')
+                             
     elif atlas_name == 'mayo':
         atlas = os.path.join(CACHE_DIR, 'atlas', 'atlas_68_rois.nii.gz')
     return atlas
@@ -70,10 +76,16 @@ def compute_connectivity_subjects(func_list, atlas, mask, conn, n_jobs=-1):
     """ Returns connectivities for all subjects
     tril matrix n_subjects * n_rois_tril
     """
-    masker = NiftiMapsMasker(maps_img=atlas, mask_img=mask,
-                             detrend=True, low_pass=.1, high_pass=.01, t_r=3.,
-                             resampling_target='data',
-                             memory=CACHE_DIR, memory_level=2)
+    if len(nib.load(atlas).get_shape()) == 4:
+        masker = NiftiMapsMasker(maps_img=atlas, mask_img=mask,
+                                 detrend=True, low_pass=.1, high_pass=.01, t_r=3.,
+                                 resampling_target='data', smoothing_fwhm=6,
+                                 memory=CACHE_DIR, memory_level=2)
+    else:
+        masker = NiftiLabelsMasker(labels_img=atlas, mask_img=mask, t_r=3.,
+                                   detrend=True, low_pass=.1, high_pass=.01, 
+                                   resampling_target='data', smoothing_fwhm=6,
+                                   memory=CACHE_DIR, memory_level=2)
 
     p = Parallel(n_jobs=n_jobs, verbose=5)(delayed(
                  compute_connectivity_subject)(conn, func, masker)\
