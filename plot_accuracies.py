@@ -29,7 +29,10 @@ def retrieve_scores(atlas_name, metric, classifier_name, group):
         for d in data:
             accuracies.append(d.score)
 
-    return np.asarray(accuracies)
+    accuracies = np.asarray(accuracies)
+    if np.median(accuracies) < .5:
+        accuracies = 1 - accuracies
+    return accuracies
 
 ###############################################################################
 # FACETGRID plotting
@@ -63,7 +66,7 @@ def boxplot_grid(atlas_name):
     """ Subplots accuracies according to metrics and classfiers.
     for a given atlas
     """
-    plt.figure(figsize=(24, 16))
+    plt.figure(figsize=(24, 24))
     for i, metric in enumerate(metrics):
         for j, classifier_name in enumerate(classifier_names):
             print i, j, len(metrics), len(classifier_names), (j+1) + i*len(classifier_names)
@@ -87,21 +90,22 @@ def boxplot_grid(atlas_name):
 # Main loop
 ###############################################################################
 
-atlas_names = ['msdl', 'mayo', 'harvard_oxford', 'juelich']
+atlas_names = ['canica', 'msdl', 'mayo', 'harvard_oxford', 'juelich']
 atlas_names_full = {'msdl' : 'Atlas MSDL',
                     'mayo' : 'Atlas Mayo Clinic',
                     'harvard_oxford': 'Atlas Harvard-Oxford',
-                    'juelich': 'Atlas Juelich'}
+                    'juelich': 'Atlas Juelich',
+                    'canica': 'CanICA 61 ROIs'}
                     
-atlas_names = ['mayo', 'harvard_oxford', 'juelich', 'msdl']
+atlas_names = ['canica', 'mayo', 'harvard_oxford', 'juelich', 'msdl']
                     
-                    
-                    
-metrics = ['gl', 'lw', 'oas', 'scov']
+metrics = ['gl', 'lw', 'oas', 'scov', 'corr', 'pcorr']
 metrics_full = {'gl' : 'GraphLasso',
                 'lw' : 'LedoitWolf',
                 'oas': 'OraclApproxShrink',
-                'scov' : 'ShrunkCov'}
+                'scov' : 'ShrunkCov',
+                'corr' : 'Pearson Corr',
+                'pcorr' : 'Partial Corr'}
 classifier_names = ['logreg_l1', 'logreg_l2', 'ridge', 'svc_l1', 'svc_l2']
 classifier_names_full = {'logreg_l1' : 'LogisticRegression_l1',
                          'logreg_l2' : 'LogisticRegression_l2',
@@ -114,3 +118,4 @@ for atlas_name in atlas_names:
     print atlas_name
     BASE_DIR = '/disk4t/mehdi/data/tmp/conn_' + atlas_name
     boxplot_grid(atlas_name)
+    

@@ -127,8 +127,8 @@ def classify_connectivity(X, y, classifier_name, n_jobs=-1):
 ###############################################################################
 # Main loop
 ###############################################################################
-dataset = fetch_adni_rs_fmri()
-#dataset = fetch_adni_baseline_rs_fmri()
+#dataset = fetch_adni_rs_fmri()
+dataset = fetch_adni_baseline_rs_fmri()
 
 mask = fetch_adni_masks()['mask_petmr']
 
