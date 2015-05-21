@@ -66,7 +66,7 @@ def boxplot_grid(atlas_name):
     """ Subplots accuracies according to metrics and classfiers.
     for a given atlas
     """
-    plt.figure(figsize=(24, 24))
+    plt.figure(figsize=(22, 18))
     for i, metric in enumerate(metrics):
         for j, classifier_name in enumerate(classifier_names):
             print i, j, len(metrics), len(classifier_names), (j+1) + i*len(classifier_names)
