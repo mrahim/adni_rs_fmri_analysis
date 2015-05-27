@@ -19,6 +19,7 @@ from sklearn.linear_model import LogisticRegression, RidgeClassifierCV
 from sklearn.svm import LinearSVC
 from sklearn.datasets.base import Bunch
 from sklearn.cross_validation import StratifiedShuffleSplit
+from sklearn.preprocessing import StandardScaler
 
 from joblib import Parallel, delayed
 CACHE_DIR = set_cache_base_dir()
@@ -48,12 +49,62 @@ def fetch_atlas(atlas_name):
                              
     elif atlas_name == 'mayo':
         atlas = os.path.join(CACHE_DIR, 'atlas', 'atlas_68_rois.nii.gz')
+    elif atlas_name == 'canica':
+	atlas = os.path.join(CACHE_DIR, 'atlas', 'atlas_canica_61_rois.nii.gz')
+    elif atlas_name == 'canica141':
+	atlas = os.path.join(CACHE_DIR, 'atlas', 'atlas_canica_141_rois.nii.gz')
+    elif atlas_name == 'tvmsdl':
+        atlas = os.path.join(CACHE_DIR, 'atlas', 'atlas_tv_msdl.nii.gz')
     return atlas
 
 
 ###############################################################################
 # Connectivity
 ###############################################################################
+from scipy import stats, linalg
+ 
+def partial_corr(C):
+    """
+    Returns the sample linear partial correlation coefficients between pairs of variables in C, controlling 
+    for the remaining variables in C.
+
+
+    Parameters
+    ----------
+    C : array-like, shape (n, p)
+        Array with the different variables. Each column of C is taken as a variable
+
+
+    Returns
+    -------
+    P : array-like, shape (p, p)
+        P[i, j] contains the partial correlation of C[:, i] and C[:, j] controlling
+        for the remaining variables in C.
+    """
+    
+    C = np.asarray(C)
+    p = C.shape[1]
+    P_corr = np.zeros((p, p), dtype=np.float)
+    for i in range(p):
+        P_corr[i, i] = 1
+        for j in range(i+1, p):
+            idx = np.ones(p, dtype=np.bool)
+            idx[i] = False
+            idx[j] = False
+            beta_i = linalg.lstsq(C[:, idx], C[:, j])[0]
+            beta_j = linalg.lstsq(C[:, idx], C[:, i])[0]
+ 
+            res_j = C[:, j] - C[:, idx].dot( beta_i)
+            res_i = C[:, i] - C[:, idx].dot(beta_j)
+            
+            corr = stats.pearsonr(res_i, res_j)[0]
+            P_corr[i, j] = corr
+            P_corr[j, i] = corr
+        
+    return P_corr
+
+
+
 def compute_connectivity_subject(conn, func, masker):
     """ Returns connectivity of one fMRI for a given atlas
     """
@@ -67,8 +118,14 @@ def compute_connectivity_subject(conn, func, masker):
         fc = OAS()
     elif conn == 'scov':
         fc = ShrunkCovariance()
-        
-    fc.fit(ts)
+    elif conn == 'corr' or conn == 'pcorr':
+	fc = Bunch(covariance_=0, precision_=0)
+    
+    if conn == 'corr' or conn == 'pcorr':
+        fc.covariance_ = np.corrcoef(ts)
+	fc.precision_ = partial_corr(ts)
+    else:
+	fc.fit(ts)
     ind = np.tril_indices(ts.shape[1], k=-1)
     return fc.covariance_[ind], fc.precision_[ind]
 
@@ -76,7 +133,7 @@ def compute_connectivity_subjects(func_list, atlas, mask, conn, n_jobs=-1):
     """ Returns connectivities for all subjects
     tril matrix n_subjects * n_rois_tril
     """
-    if len(nib.load(atlas).get_shape()) == 4:
+    if len(nib.load(atlas).shape) == 4:
         masker = NiftiMapsMasker(maps_img=atlas, mask_img=mask,
                                  detrend=True, low_pass=.1, high_pass=.01, t_r=3.,
                                  resampling_target='data', smoothing_fwhm=6,
@@ -132,11 +189,12 @@ dataset = fetch_adni_baseline_rs_fmri()
 
 mask = fetch_adni_masks()['mask_petmr']
 
-atlas_names = ['mayo', 'harvard_oxford', 'juelich', 'msdl']
-
+atlas_names = ['canica141', 'canica', 'mayo', 'harvard_oxford', 'juelich', 'msdl']
+atlas_names = ['tvmsdl']
 for atlas_name in atlas_names:
     atlas = fetch_atlas(atlas_name)
     conn_names = ['gl', 'lw', 'oas', 'scov']
+    #conn_names = ['corr']
     for conn_name in conn_names:
         conn = compute_connectivity_subjects(list(dataset.func), atlas, mask,
                                              conn=conn_name, n_jobs=-1)
@@ -147,6 +205,7 @@ for atlas_name in atlas_names:
         for groups in all_groups:
             groups_idx = np.hstack((idx[groups[0]], idx[groups[1]]))
             X = conn[groups_idx, 0, :]
+	    #X = StandardScaler().fit_transform(X)
             y = np.asarray([1] * len(idx[groups[0]]) +
                            [0] * len(idx[groups[1]]))
             sss = StratifiedShuffleSplit(y, n_iter=100,

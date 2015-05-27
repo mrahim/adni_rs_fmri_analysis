@@ -125,5 +125,3 @@ BASE_DIR = '/disk4t/mehdi/data/tmp/conn_' + atlas_name
 centroids = atlas_to_coords(atlas_name)
 adj_mat = retrieve_coeffs(atlas_name, metric, classifier_name, groups[0], len(centroids))
 plot_connectome(adj_mat , centroids, edge_threshold='99.8%')
-
-

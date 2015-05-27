@@ -48,7 +48,7 @@ output_label_list = []
 for np_file in np_files:
     data = np.load(os.path.join(base_dir, np_file))
     map_title = 'canica'
-    if os.path.splitext(np_file)[0] != 'canica':
+    if os.path.splitext(np_file)[0] != 'canica' and os.path.splitext(np_file)[0] != 'canica_200':
         map_title = 'tv_msdl'
         data = data['subject_maps']
     print data.shape
@@ -67,7 +67,7 @@ for np_file in np_files:
         data_lab = label(data)[0]
         
         for v in np.unique(data_lab):
-            if len(np.where(data_lab == v)[0]) < 500:
+            if len(np.where(data_lab == v)[0]) < 250:
                 data_lab[data_lab == v] = 0
         
         for v in np.unique(data_lab):
@@ -78,8 +78,8 @@ for np_file in np_files:
                 output_label_list.append(data_labels)
             
         img_l = nib.Nifti1Image(data_lab, mask_affine)
-        plot_roi(img_l, title=map_title + '_roi_' + str(i), cmap=cm.rainbow, output_file=map_title + '_roi_' + str(i))
-        plot_stat_map(index_img(img, i), title=map_title + '_' + str(i), output_file=map_title + '_roi_' + str(i),
+        plot_roi(img_l, title=map_title + '_roi_' + str(i), cmap=cm.rainbow, output_file='canica130/'+map_title + '_roi_' + str(i))
+        plot_stat_map(index_img(img, i), title=map_title + '_' + str(i), output_file='canica130/'+map_title + '_stat_' + str(i),
                       threshold=0)
     
     break
