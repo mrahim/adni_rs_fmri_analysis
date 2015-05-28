@@ -69,7 +69,6 @@ class ConnectivityClassifier(BaseEstimator, TransformerMixin):
         self.memory_level = memory_level
         self.idx = set_group_indices(dx_group)
         self.random_state = random_state
-        self.idx['MCI'] = np.hstack((self.idx['EMCI'], self.idx['LMCI']))
         
                                  
     def compute_connectivity(self, metric):
