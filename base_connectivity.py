@@ -24,22 +24,18 @@ from nilearn.datasets import fetch_msdl_atlas
 from fetch_data import set_cache_base_dir
 
 CACHE_DIR = set_cache_base_dir()
+
 def fetch_atlas(atlas_name):
     """Retruns selected atlas path
     """
     if atlas_name == 'msdl':
         atlas = fetch_msdl_atlas()['maps']
     elif atlas_name == 'harvard_oxford':
-#        atlas = os.path.join(CACHE_DIR, 'atlas',
-#                             'HarvardOxford-cortl-prob-2mm.nii.gz')
         atlas = os.path.join(CACHE_DIR, 'atlas',
                              'HarvardOxford-cortl-maxprob-thr0-2mm.nii.gz')
     elif atlas_name == 'juelich':
-#        atlas = os.path.join(CACHE_DIR, 'atlas',
-#                             'Juelich-prob-2mm.nii.gz')
         atlas = os.path.join(CACHE_DIR, 'atlas',
                              'Juelich-maxprob-thr0-2mm.nii.gz')
-                             
     elif atlas_name == 'mayo':
         atlas = os.path.join(CACHE_DIR, 'atlas', 'atlas_68_rois.nii.gz')
     elif atlas_name == 'canica':
@@ -112,9 +108,9 @@ def compute_connectivity_subject(conn, func, masker):
     
     if conn == 'corr' or conn == 'pcorr':
         fc.covariance_ = np.corrcoef(ts)
-	fc.precision_ = partial_corr(ts)
+        fc.precision_ = partial_corr(ts)
     else:
-	fc.fit(ts)
+        fc.fit(ts)
     ind = np.tril_indices(ts.shape[1], k=-1)
     return fc.covariance_[ind], fc.precision_[ind]
 
@@ -147,15 +143,15 @@ class Connectivity(BaseEstimator, TransformerMixin):
     fc_ : functional connectivity (covariance and precision)
     """
     
-    def __init__(self, atlas, metric, mask, detrend=True,
+    def __init__(self, atlas_name, metric, mask, detrend=True,
                  low_pass=.1, high_pass=.01, t_r=3.,
                  resampling_target='data', smoothing_fwhm=6.,
-                 memory='', memory_level=0, n_jobs=1):
-        self.atlas = atlas
+                 memory='', memory_level=2, n_jobs=1):
+        self.atlas = fetch_atlas(atlas_name)
         self.metric = metric
         self.mask = mask
         self.n_jobs = n_jobs
-        if len(nib.load(atlas).shape) == 4:
+        if len(nib.load(self.atlas).shape) == 4:
             self.masker  = NiftiMapsMasker(maps_img=self.atlas,
                                            mask_img=self.mask,
                                            detrend=detrend,
