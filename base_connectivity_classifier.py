@@ -85,7 +85,7 @@ class ConnectivityClassifier(BaseEstimator, TransformerMixin):
         if hasattr(self, 'connectivity'):        
             groups_idx = np.hstack((self.idx[groups[0]],
                                     self.idx[groups[1]]))
-            X = self.connectivity[groups_idx, 0, :]
+            X = self.connectivity[groups_idx, :]
             y = np.asarray([+1] * len(self.idx[groups[0]]) +
                            [-1] * len(self.idx[groups[1]]))
             sss = StratifiedShuffleSplit(y, n_iter=self.n_iter,

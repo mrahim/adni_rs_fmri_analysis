@@ -13,7 +13,7 @@ from fetch_data import fetch_adni_baseline_rs_fmri, fetch_adni_masks, set_cache_
 CACHE_DIR = set_cache_base_dir()
 dataset = fetch_adni_baseline_rs_fmri()
 mask = fetch_adni_masks()['mask_petmr']
-atlas = fetch_atlas('msdl')
 
-conn = Connectivity(atlas, 'corr', mask, memory=CACHE_DIR, n_jobs=2)
-fc = conn.fit(dataset.func[:2])
+conn = Connectivity('msdl', 'tangent', mask, memory=CACHE_DIR, n_jobs=2)
+fc = conn.fit(dataset.func[:10])
+

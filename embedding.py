@@ -399,7 +399,7 @@ class CovEmbedding(BaseEstimator, TransformerMixin):
 
         if self.kind == 'tangent':
             covs = [self.cov_estimator_.fit(x).covariance_ for x in X]
-            self.mean_cov_ = geometric_mean(covs, max_iter=30, tol=1e-7)
+            self.mean_cov_ = geometric_mean(covs, max_iter=300, tol=1e-6)
             self.whitening_ = map_sym(lambda x: 1. / np.sqrt(x),
                                       self.mean_cov_)
 

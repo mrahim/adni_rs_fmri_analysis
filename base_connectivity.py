@@ -22,6 +22,8 @@ import nibabel as nib
 from joblib import Parallel, delayed
 from nilearn.datasets import fetch_msdl_atlas
 from fetch_data import set_cache_base_dir
+from embedding import CovEmbedding, vec_to_sym
+
 
 CACHE_DIR = set_cache_base_dir()
 
@@ -89,7 +91,10 @@ def partial_corr(C):
         
     return P_corr
 
-    
+
+def do_mask_img(func, masker):
+    return masker.fit_transform(func)
+
 def compute_connectivity_subject(conn, func, masker):
     """ Returns connectivity of one fMRI for a given atlas
     """
@@ -103,10 +108,11 @@ def compute_connectivity_subject(conn, func, masker):
         fc = OAS()
     elif conn == 'scov':
         fc = ShrunkCovariance()
-    elif conn == 'corr' or conn == 'pcorr':
+        
 	fc = Bunch(covariance_=0, precision_=0)
     
     if conn == 'corr' or conn == 'pcorr':
+        fc = Bunch(covariance_=0, precision_=0)
         fc.covariance_ = np.corrcoef(ts)
         fc.precision_ = partial_corr(ts)
     else:
@@ -177,8 +183,19 @@ class Connectivity(BaseEstimator, TransformerMixin):
     def fit(self, imgs):
         """ compute connectivities
         """
-        p = Parallel(n_jobs=self.n_jobs, verbose=5)(delayed(
+        if self.metric == 'correlation' or \
+           self.metric == 'partial correlation' or \
+           self.metric == 'tangent' :
+           ts = Parallel(n_jobs=self.n_jobs, verbose=5)(delayed(
+                         do_mask_img)(func, self.masker) for func in imgs)
+           cov_embedding = CovEmbedding( kind=self.metric )
+           p = np.asarray(vec_to_sym(cov_embedding.fit_transform(ts)))
+           ind = np.tril_indices(p.shape[1], k=-1)
+           
+           self.fc_ = np.asarray([p[i, ...][ind] for i in range(p.shape[0])])
+        else:
+            p = Parallel(n_jobs=self.n_jobs, verbose=5)(delayed(
                  compute_connectivity_subject)(self.metric, func,
                                     self.masker) for func in imgs)
-        self.fc_ = np.asarray(p)
+            self.fc_ = np.asarray(p)[:, 0, :]
         return self.fc_
