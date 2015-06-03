@@ -133,9 +133,7 @@ def compute_connectivity_subject(func, masker_ROI, masker_vox, metric):
     
     fc_ = np.empty((ts_rois.shape[1], ts_vox.shape[1]))
     for i, roi in enumerate(ts_rois.T):
-        print i
-        if i > 3:
-            break
+        print 'ROI ', i
         for j, vox in enumerate(ts_vox.T):
             fc_[i, j] = compute_connectivity_voxel(roi, vox, metric)
     return fc_
