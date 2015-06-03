@@ -128,6 +128,7 @@ def compute_connectivity_subject(func, masker_ROI, masker_vox, metric):
         2. compute connectivities
     """
     
+    print func
     ts_rois = masker_ROI.fit_transform(func)
     ts_vox = masker_vox.fit_transform(func)
     
@@ -221,8 +222,8 @@ class ROItoVoxConnectivity(BaseEstimator, TransformerMixin):
         """ All subjects
         """
         joblibMemory = Memory(CACHE_DIR, mmap_mode='r+', verbose=5)
-        return joblibMemory.cache(compute_connectivity_subjects)\
-        (imgs, self.n_jobs, self.masker_ROI, self.masker_vox, self.metric)
+        return np.asarray(joblibMemory.cache(compute_connectivity_subjects)\
+        (imgs, self.n_jobs, self.masker_ROI, self.masker_vox, self.metric))
     
     def fit2(self, imgs):
         """ compute connectivities
