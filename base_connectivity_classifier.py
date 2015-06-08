@@ -13,6 +13,7 @@ from sklearn.cross_validation import StratifiedShuffleSplit, ShuffleSplit
 from fetch_data import set_group_indices, set_cache_base_dir
 from sklearn.base import BaseEstimator, TransformerMixin
 from base_connectivity import Connectivity
+from base_network_connectivity import NetworkConnectivity
 
 CACHE_DIR = set_cache_base_dir()
 
@@ -111,6 +112,14 @@ class ConnectivityClassifier(BaseEstimator, TransformerMixin):
         conn = Connectivity(self.atlas, metric, self.mask,
                             memory=CACHE_DIR, n_jobs=self.n_jobs)
         self.connectivity = conn.fit(self.imgs)
+        
+    def compute_network_connectivity(self, rois, metric):
+        """ Returns covariance matrix
+        """
+        conn = NetworkConnectivity(atlas_name=self.atlas, rois=rois,
+                                   metric=metric, mask=self.mask,
+                                   memory=CACHE_DIR, n_jobs=self.n_jobs)
+        self.connectivity = conn.fit(self.imgs)    
         
     
     def classify(self, dataset=None, groups=['AD', 'MCI'], classifier_name='logreg_l2'):
