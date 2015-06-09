@@ -91,13 +91,14 @@ class ConnectivityClassifier(BaseEstimator, TransformerMixin):
     coefs_
     """
     
-    def __init__(self, imgs, mask, atlas, dx_group, n_iter=100,
+    def __init__(self, imgs, mask, atlas, dx_group, rois=False, n_iter=100,
                  memory=CACHE_DIR, memory_level=2, n_jobs=-1, random_state=42):
         """ initialization
         """
         self.imgs = imgs
         self.mask = mask
         self.atlas = atlas
+        self.rois = rois
         self.n_jobs = n_jobs
         self.n_iter = n_iter
         self.memory = memory
@@ -109,23 +110,17 @@ class ConnectivityClassifier(BaseEstimator, TransformerMixin):
     def compute_connectivity(self, metric):
         """ Return covariance matrix
         """
-        conn = Connectivity(self.atlas, metric, self.mask,
+        conn = Connectivity(self.atlas, metric, self.mask, self.rois,
                             memory=CACHE_DIR, n_jobs=self.n_jobs)
         self.connectivity = conn.fit(self.imgs)
         
-    def compute_network_connectivity(self, rois, metric):
-        """ Returns covariance matrix
-        """
-        conn = NetworkConnectivity(atlas_name=self.atlas, rois=rois,
-                                   metric=metric, mask=self.mask,
-                                   memory=CACHE_DIR, n_jobs=self.n_jobs)
-        self.connectivity = conn.fit(self.imgs)    
         
     
-    def classify(self, dataset=None, groups=['AD', 'MCI'], classifier_name='logreg_l2'):
+    def classify(self, dataset=None, groups=['AD', 'MCI'],
+                 classifier_name='logreg_l2'):
         """ Returns accuracy scores
         """
-        if hasattr(self, 'connectivity'):        
+        if hasattr(self, 'connectivity'):       
             groups_idx = np.hstack((self.idx[groups[0]],
                                     self.idx[groups[1]]))
             X = self.connectivity[groups_idx, :]

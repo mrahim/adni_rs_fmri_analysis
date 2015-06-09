@@ -17,8 +17,8 @@ conn = ROItoVoxConnectivity(atlas_name='msdl',
                             mask=mask,
                             memory=CACHE_DIR,
                             memory_level=2,
-                            n_jobs=-1)
+                            n_jobs=10)
 
-conn.fit_subjects(dataset.func)
+output = conn.fit_subjects(dataset.func[:10])
 
 

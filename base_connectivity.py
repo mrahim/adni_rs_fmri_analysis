@@ -23,11 +23,74 @@ from joblib import Parallel, delayed
 from nilearn.datasets import fetch_msdl_atlas
 from fetch_data import set_cache_base_dir
 from embedding import CovEmbedding, vec_to_sym
-
+from nilearn.image import index_img
 
 CACHE_DIR = set_cache_base_dir()
 
-def fetch_atlas(atlas_name):
+
+def atlas_rois_to_coords(atlas_name, rois):
+    """Returns coords of atlas ROIs
+    """
+
+    affine = nib.load(atlas_name).get_affine()
+    data = nib.load(atlas_name).get_data()
+    centroids = []
+    if len(data.shape) == 4:
+        for i in range(data.shape[-1]):
+            voxels = np.where(data[..., i] > 0)
+            centroid = np.mean(voxels, axis=1)
+            dvoxels = data[..., i]
+            dvoxels = dvoxels[voxels]
+            voxels = np.asarray(voxels).T
+            centroid = np.average(voxels, axis=0, weights=dvoxels)
+            centroid = np.append(centroid, 1)
+            centroid = np.dot(affine, centroid)[:-1]
+            centroids.append(centroid)
+    else:
+        vals = np.unique(data)
+        for i in range(len(vals)):
+            centroid = np.mean(np.where(data == i), axis=1)
+            centroid = np.append(centroid, 1)
+            centroid = np.dot(affine, centroid)[:-1]
+            centroids.append(centroid)
+
+    centroids = np.asarray(centroids)[rois]
+    return centroids
+    
+def fetch_dmn_atlas(atlas_name, atlas):
+    """ Returns a bunch containing the DMN rois
+    and their coordinates
+    """
+    
+    if atlas_name == 'msdl':    
+        rois = np.arange(3, 7)
+        rois_names = ['L-DMN', 'M-DMN', 'F-DMN', 'R-DMN']
+    elif atlas_name == 'mayo':
+        rois = np.concatenate(( range(39, 43), range(47, 51),
+                                range(52, 56), range(62, 68) ))
+        rois_names = ['adDMN_L', 'adDMN_R', 'avDMN_L', 'avDMN_R', 'dDMN_L_Lat',
+                      'dDMN_L_Med', 'dDMN_R_Lat', 'dDMN_R_Med', 'pDMN_L_Lat',
+                      'pDMN_L_Med', 'pDMN_R_Lat', 'pDMN_R_Med', 'tDMN_L',
+                      'tDMN_R', 'vDMN_L_Lat', 'vDMN_L_Med', 'vDMN_R_Lat',
+                      'vDMN_R_Med']
+    elif atlas_name == 'canica':
+        rois = np.concatenate((range(20, 23), [36]))
+        rois_names = ['DMN']*4
+    n_rois = len(rois)
+    centroids = atlas_rois_to_coords(atlas, rois)
+    
+    return Bunch(n_rois=n_rois, rois=rois, rois_names=rois_names,
+                 rois_centroids=centroids)
+
+def nii_shape(img):
+    """ Returns the img shape
+    """
+    if isinstance(img, nib.Nifti1Image):
+        return img.shape
+    else:
+        return nib.load(img).shape
+
+def fetch_atlas(atlas_name, rois=False):
     """Retruns selected atlas path
     """
     if atlas_name == 'msdl':
@@ -46,7 +109,12 @@ def fetch_atlas(atlas_name):
 	atlas = os.path.join(CACHE_DIR, 'atlas', 'atlas_canica_141_rois.nii.gz')
     elif atlas_name == 'tvmsdl':
         atlas = os.path.join(CACHE_DIR, 'atlas', 'atlas_tv_msdl.nii.gz')
-    return atlas
+
+    dmn = None
+    if ( atlas_name in ['msdl', 'mayo', 'canica'] ) and rois:
+        dmn = fetch_dmn_atlas(atlas_name, atlas)
+        atlas = index_img(atlas, dmn['rois'])
+    return atlas, dmn
     
 def partial_corr(C):
     """
@@ -149,15 +217,15 @@ class Connectivity(BaseEstimator, TransformerMixin):
     fc_ : functional connectivity (covariance and precision)
     """
     
-    def __init__(self, atlas_name, metric, mask, detrend=True,
+    def __init__(self, atlas_name, metric, mask, rois=False, detrend=True,
                  low_pass=.1, high_pass=.01, t_r=3.,
                  resampling_target='data', smoothing_fwhm=6.,
                  memory='', memory_level=2, n_jobs=1):
-        self.atlas = fetch_atlas(atlas_name)
+        self.atlas, self.rois = fetch_atlas(atlas_name, rois)
         self.metric = metric
         self.mask = mask
         self.n_jobs = n_jobs
-        if len(nib.load(self.atlas).shape) == 4:
+        if len(nii_shape(self.atlas)) == 4:
             self.masker  = NiftiMapsMasker(maps_img=self.atlas,
                                            mask_img=self.mask,
                                            detrend=detrend,
