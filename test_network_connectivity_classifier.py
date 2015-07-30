@@ -19,7 +19,7 @@ CACHE_DIR = set_cache_base_dir()
 
 #dataset = fetch_adni_baseline_rs_fmri()
 dataset = fetch_adni_longitudinal_rs_fmri_DARTEL()
-mask = fetch_adni_masks()['mask_petmr']
+mask = fetch_adni_masks()['mask_fmri']
 
 
 all_groups = [['AD', 'MCI'], ['AD', 'Normal'], ['MCI', 'Normal']]
@@ -33,8 +33,7 @@ classifier_names = ['ridge', 'svc_l1', 'svc_l2',
 conn_names = ['corr', 'correlation', 'tangent', 'gl', 'lw', 'oas', 'scov']
 
 ###
-
-atlas_names = ['msdl', 'canica', 'mayo']
+atlas_names = ['mayo']#, 'msdl', 'canica']
 classifier_names = ['svc_l2', 'logreg_l2']               
 conn_names = ['correlation']
 
@@ -45,12 +44,15 @@ for atlas_name in atlas_names:
                                              atlas=atlas_name,
                                              rois=True,
                                              dx_group=dataset.dx_group,
+                                             memory='',
+                                             memory_level=0,
                                              n_jobs=20)
         connclassif.compute_connectivity(conn_name)
+        #np.savez_compressed(atlas_name, data=connclassif.connectivity)
         for groups in all_groups:
             print groups
             for classifier_name in classifier_names:
-                connclassif.classify(dataset=None, #dataset
+                connclassif.classify(dataset=dataset,
                                      groups=groups,
                                      classifier_name=classifier_name)
                 output_folder = os.path.join(CACHE_DIR, 'DARTEL_ROIS',
@@ -60,6 +62,7 @@ for atlas_name in atlas_names:
                 output_file = os.path.join(output_folder,
                                            '_'.join([groups[0], groups[1],
                                                      atlas_name, conn_name,
-                                                     classifier_name]))
-                np.savez_compressed(output_file, data=connclassif.scores_)
+                                                     classifier_name, '_subj']))
+                np.savez_compressed(output_file, scores=connclassif.scores_,
+                                    coefs=connclassif.coefs_)
     

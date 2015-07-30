@@ -64,14 +64,23 @@ def fetch_dmn_atlas(atlas_name):
     if atlas_name == 'msdl':    
         rois = np.arange(3, 7)
         rois_names = ['L-DMN', 'M-DMN', 'F-DMN', 'R-DMN']
-    
+    elif atlas_name == 'mayo':
+        rois = np.concatenate(( range(39, 43), range(47, 51),
+                                range(52, 56), range(62, 68) ))
+        rois_names = ['adDMN_L', 'adDMN_R', 'avDMN_L', 'avDMN_R', 'dDMN_L_Lat',
+                      'dDMN_L_Med', 'dDMN_R_Lat', 'dDMN_R_Med', 'pDMN_L_Lat',
+                      'pDMN_L_Med', 'pDMN_R_Lat', 'pDMN_R_Med', 'tDMN_L',
+                      'tDMN_R', 'vDMN_L_Lat', 'vDMN_L_Med', 'vDMN_R_Lat',
+                      'vDMN_R_Med']
+    elif atlas_name == 'canica':
+        rois = np.concatenate((range(20, 23), [36]))
+        rois_names = ['DMN']*4
     n_rois = len(rois)
     centroids = atlas_rois_to_coords(atlas_name, rois)
     
     return Bunch(n_rois=n_rois, rois=rois, rois_names=rois_names,
                  rois_centroids=centroids)
     
-
 
 def fetch_atlas(atlas_name):
     """Retruns selected atlas path
